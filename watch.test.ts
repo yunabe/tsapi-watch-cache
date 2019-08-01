@@ -206,7 +206,8 @@ it("service-api", async () => {
       return process.cwd();
     }
     function getCompilationSettings(): ts.CompilerOptions {
-      // typeRoots here is no-op?
+      // typeRoots here is no-op:
+      // We may need to implement resolveTypeReferenceDirectives?
       return {
         target: ts.ScriptTarget.ES2017,
         declaration: true
