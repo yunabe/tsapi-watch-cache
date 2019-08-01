@@ -93,6 +93,8 @@ ${data}
       console.log(d.messageText);
     }
   );
+  // Define host.afterProgramCreate to customize tasks after the recreation of program.
+  // By default, it emits output files!
   expect(host.createProgram).toBe(
     ts.createEmitAndSemanticDiagnosticsBuilderProgram
   );
