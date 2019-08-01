@@ -1,7 +1,28 @@
+import * as fs from "fs";
 import * as ts from "typescript";
 
-it("watch-incremental", async () => {
-  const performance = (ts as any).performance;
+const performance = (ts as any).performance;
+
+function reportTimeStatistic() {
+  const programTime = performance.getDuration("Program");
+  const bindTime = performance.getDuration("Bind");
+  const checkTime = performance.getDuration("Check");
+  const emitTime = performance.getDuration("Emit");
+  const lines = [];
+  // Individual component times.
+  // Note: To match the behavior of previous versions of the compiler, the reported parse time includes
+  // I/O read time and processing time for triple-slash references and module imports, and the reported
+  // emit time includes I/O write time. We preserve this behavior so we can accurately compare times.
+  lines.push(`I/O read ${performance.getDuration("I/O Read")}`);
+  lines.push(`I/O write ${performance.getDuration("I/O Write")}`);
+  lines.push(`Parse time ${programTime}`);
+  lines.push(`Bind time ${bindTime}`);
+  lines.push(`Check time ${checkTime}`);
+  lines.push(`Emit time ${emitTime}`);
+  console.log(lines.join("\n"));
+}
+
+it("watch-api", async () => {
   const srcname = "mysrc.ts";
 
   const sys = Object.create(ts.sys) as ts.System;
@@ -68,23 +89,116 @@ ${data}
   expect(end - start).toBeLessThan(100);
 
   builder.close(); // Not available in typescript3.5.3.
+});
 
-  function reportTimeStatistic() {
-    const programTime = performance.getDuration("Program");
-    const bindTime = performance.getDuration("Bind");
-    const checkTime = performance.getDuration("Check");
-    const emitTime = performance.getDuration("Emit");
-    const lines = [];
-    // Individual component times.
-    // Note: To match the behavior of previous versions of the compiler, the reported parse time includes
-    // I/O read time and processing time for triple-slash references and module imports, and the reported
-    // emit time includes I/O write time. We preserve this behavior so we can accurately compare times.
-    lines.push(`I/O read ${performance.getDuration("I/O Read")}`);
-    lines.push(`I/O write ${performance.getDuration("I/O Write")}`);
-    lines.push(`Parse time ${programTime}`);
-    lines.push(`Bind time ${bindTime}`);
-    lines.push(`Check time ${checkTime}`);
-    lines.push(`Emit time ${emitTime}`);
-    console.log(lines.join("\n"));
+it("service-api", async () => {
+  const srcname = "mysrc.ts";
+  let srcVersion = 0;
+  let srcContent = "";
+
+  let start: number, end: number;
+  const host = createLanguageServiceHost();
+  const service = ts.createLanguageService(host, ts.createDocumentRegistry());
+
+  setSrcContent(`var i: number = 10;`);
+  performance.enable();
+  start = Date.now();
+  let output = service.getEmitOutput(srcname);
+  end = Date.now();
+  expect(output.emitSkipped).toBeFalsy();
+  expect(end - start).toBeLessThan(1000);
+  reportTimeStatistic();
+  output.outputFiles.forEach(file => {
+    if (file.name === "mysrc.js") {
+      expect(file.text).toEqual("var i = 10;\r\n");
+    } else {
+      fail(`Unexpected file: ${file.name}`);
+    }
+  });
+
+  setSrcContent(`var j: number = 20;`);
+  performance.enable();
+  start = Date.now();
+  output = service.getEmitOutput(srcname);
+  end = Date.now();
+  expect(output.emitSkipped).toBeFalsy();
+  expect(end - start).toBeLessThan(50);
+  reportTimeStatistic();
+  output.outputFiles.forEach(file => {
+    if (file.name === "mysrc.js") {
+      expect(file.text).toEqual("var j = 20;\r\n");
+    } else {
+      fail(`Unexpected file: ${file.name}`);
+    }
+  });
+
+  function setSrcContent(content: string) {
+    srcVersion++;
+    srcContent = content;
+  }
+
+  function createLanguageServiceHost(): ts.LanguageServiceHost {
+    return {
+      getScriptFileNames,
+      getScriptVersion,
+      getScriptSnapshot,
+      getCurrentDirectory,
+      getCompilationSettings,
+      getDefaultLibFileName,
+      fileExists,
+      readFile,
+      readDirectory
+    };
+
+    function getProjectVersion() {
+      return String(srcVersion);
+    }
+    function getScriptFileNames() {
+      return [srcname];
+    }
+    function getScriptVersion(path: string) {
+      if (path === srcname) {
+        return String(srcVersion);
+      }
+      return "1";
+    }
+    function getScriptSnapshot(fileName: string): ts.IScriptSnapshot {
+      if (fileName === srcname) {
+        return ts.ScriptSnapshot.fromString(srcContent);
+      }
+      return ts.ScriptSnapshot.fromString(fs.readFileSync(fileName).toString());
+    }
+    function getCurrentDirectory() {
+      const cwd = process.cwd();
+      console.log("getCurrentDirectory", cwd);
+      return cwd;
+    }
+    function getCompilationSettings(): ts.CompilerOptions {
+      return {
+        target: ts.ScriptTarget.ES2017
+      };
+    }
+    function getDefaultLibFileName(options: ts.CompilerOptions): string {
+      return ts.getDefaultLibFilePath(options);
+    }
+    function fileExists(path: string) {
+      let exist = ts.sys.fileExists(path);
+      console.log("fileExists: ", path, exist);
+      return exist;
+    }
+    function readFile(path: string, encoding?: string): string {
+      console.log("readFile:", path);
+      return ts.sys.readFile(path, encoding);
+    }
+    function readDirectory(
+      path: string,
+      extensions?: ReadonlyArray<string>,
+      exclude?: ReadonlyArray<string>,
+      include?: ReadonlyArray<string>,
+      depth?: number
+    ): string[] {
+      console.log("readDirectory:", path);
+      return ts.sys.readDirectory(path, extensions, exclude, include, depth);
+    }
   }
 });
