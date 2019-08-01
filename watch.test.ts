@@ -1,5 +1,7 @@
 import * as fs from "fs";
+import * as path from "path";
 import * as ts from "typescript";
+import * as glob from "glob";
 
 const performance = (ts as any).performance;
 
@@ -22,7 +24,32 @@ function reportTimeStatistic() {
   console.log(lines.join("\n"));
 }
 
+function getTypeFiles(): string[] {
+  function findNodeModules(): string | null {
+    let dir = __dirname;
+    while (true) {
+      const nm = path.join(dir, "node_modules");
+      if (fs.existsSync(nm)) {
+        return nm;
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) {
+        break;
+      }
+      dir = parent;
+    }
+    return null;
+  }
+
+  const nodeModules = findNodeModules();
+  if (!nodeModules) {
+    return [];
+  }
+  return glob.sync(path.join(nodeModules, "@types/**/*.d.ts"));
+}
+
 it("watch-api", async () => {
+  console.log("==== watch-api ====");
   const srcname = "mysrc.ts";
 
   const sys = Object.create(ts.sys) as ts.System;
@@ -92,6 +119,7 @@ ${data}
 });
 
 it("service-api", async () => {
+  console.log("==== service-api ====");
   const srcname = "mysrc.ts";
   let srcVersion = 0;
   let srcContent = "";
@@ -102,15 +130,15 @@ it("service-api", async () => {
 
   setSrcContent(`var i: number = 10;`);
   performance.enable();
-  start = Date.now();
+  ts.getPreEmitDiagnostics(service.getProgram());
   let output = service.getEmitOutput(srcname);
-  end = Date.now();
-  expect(output.emitSkipped).toBeFalsy();
-  expect(end - start).toBeLessThan(1000);
   reportTimeStatistic();
+  expect(output.emitSkipped).toBeFalsy();
   output.outputFiles.forEach(file => {
     if (file.name === "mysrc.js") {
       expect(file.text).toEqual("var i = 10;\r\n");
+    } else if (file.name == "mysrc.d.ts") {
+      expect(file.text).toEqual("declare var i: number;\r\n");
     } else {
       fail(`Unexpected file: ${file.name}`);
     }
@@ -119,14 +147,18 @@ it("service-api", async () => {
   setSrcContent(`var j: number = 20;`);
   performance.enable();
   start = Date.now();
+  ts.getPreEmitDiagnostics(service.getProgram());
   output = service.getEmitOutput(srcname);
   end = Date.now();
-  expect(output.emitSkipped).toBeFalsy();
-  expect(end - start).toBeLessThan(50);
   reportTimeStatistic();
+  expect(output.emitSkipped).toBeFalsy();
+  // "Check time" is long, it's not cached for some reason.
+  expect(end - start).toBeGreaterThan(200);
   output.outputFiles.forEach(file => {
     if (file.name === "mysrc.js") {
       expect(file.text).toEqual("var j = 20;\r\n");
+    } else if (file.name === "mysrc.d.ts") {
+      expect(file.text).toEqual("declare var j: number;\r\n");
     } else {
       fail(`Unexpected file: ${file.name}`);
     }
@@ -138,6 +170,8 @@ it("service-api", async () => {
   }
 
   function createLanguageServiceHost(): ts.LanguageServiceHost {
+    const files = getTypeFiles();
+    files.push(srcname);
     return {
       getScriptFileNames,
       getScriptVersion,
@@ -154,7 +188,7 @@ it("service-api", async () => {
       return String(srcVersion);
     }
     function getScriptFileNames() {
-      return [srcname];
+      return files;
     }
     function getScriptVersion(path: string) {
       if (path === srcname) {
@@ -169,13 +203,13 @@ it("service-api", async () => {
       return ts.ScriptSnapshot.fromString(fs.readFileSync(fileName).toString());
     }
     function getCurrentDirectory() {
-      const cwd = process.cwd();
-      console.log("getCurrentDirectory", cwd);
-      return cwd;
+      return process.cwd();
     }
     function getCompilationSettings(): ts.CompilerOptions {
+      // typeRoots here is no-op?
       return {
-        target: ts.ScriptTarget.ES2017
+        target: ts.ScriptTarget.ES2017,
+        declaration: true
       };
     }
     function getDefaultLibFileName(options: ts.CompilerOptions): string {
@@ -183,12 +217,11 @@ it("service-api", async () => {
     }
     function fileExists(path: string) {
       let exist = ts.sys.fileExists(path);
-      console.log("fileExists: ", path, exist);
+      // console.log("fileExists: ", path, exist);
       return exist;
     }
     function readFile(path: string, encoding?: string): string {
-      console.log("readFile:", path);
-      return ts.sys.readFile(path, encoding);
+      throw new Error("readFile is not implemented");
     }
     function readDirectory(
       path: string,

@@ -6,15 +6,15 @@
   "author": "Yu Watanabe",
   "license": "MIT",
   "devDependencies": {
+    "@types/glob": "^7.1.1",
     "@types/jest": "^24.0.16",
     "@types/node": "^12.6.8",
+    "glob": "^7.1.4",
     "jest": "^24.8.0",
-    "ts-jest": "^24.0.2"
+    "ts-jest": "^24.0.2",
+    "typescript": "^3.6.0-dev.20190730"
   },
   "scripts": {
     "test": "jest"
-  },
-  "dependencies": {
-    "typescript": "^3.6.0-dev.20190730"
   }
 }
