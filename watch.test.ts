@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import { join as joinPath } from "path";
 import * as path from "path";
 import * as ts from "typescript";
 import * as glob from "glob";
@@ -110,6 +111,120 @@ ${data}
     writeResolve = resolve;
   });
 
+  srcUpdateCb(srcname, ts.FileWatcherEventKind.Changed);
+  const start = Date.now();
+  await writePromise;
+  const end = Date.now();
+  reportTimeStatistic();
+  expect(end - start).toBeLessThan(100);
+
+  builder.close(); // Not available in typescript3.5.3.
+});
+
+it("watch-api-with-config", async () => {
+  console.log("==== watch-api-with-config ====");
+  const tsConfigName = "mytsconfig.json";
+  const srcname = "mysrc.ts";
+  const currentDir = ts.sys.getCurrentDirectory();
+
+  const sys = Object.create(ts.sys) as ts.System;
+  sys.setTimeout = (callback, ms) => {
+    ts.sys.setTimeout(callback, 0);
+  };
+  sys.readFile = function(path, encoding) {
+    console.log("readFile:", path);
+    if (path === tsConfigName) {
+      return JSON.stringify({
+        include: ["mysrc/**/*"]
+      });
+    }
+    if (path === joinPath(currentDir, "mysrc/mysrc.ts")) {
+      let ret = `var x: number = ${Math.random()}`;
+      console.log(`Return ${ret} as ${path}`);
+      return ret;
+    }
+    return ts.sys.readFile(path, encoding);
+  };
+  sys.writeFile = function(path, data) {
+    console.log(`Write File:: path == ${path}
+${data}
+`);
+    if (writeResolve) {
+      writeResolve();
+      writeResolve = null;
+    }
+  };
+  // getDrectory list directories under path (See watchUtilities.ts).
+  sys.getDirectories = (path: string): string[] => {
+    if (path === currentDir) {
+      return ["mysrc"];
+    }
+    if (path === joinPath(currentDir, "mysrc")) {
+      return [];
+    }
+    return ts.sys.getDirectories(path);
+  };
+  // readDirectory list files under path.
+  sys.readDirectory = (path, extensions, exclude, include, depth): string[] => {
+    console.log("readDirectory", path);
+    if (path === joinPath(currentDir, "mysrc")) {
+      return ["mysrc.ts"];
+    }
+    return ts.sys.readDirectory(path, extensions, exclude, include, depth);
+  };
+  sys.directoryExists = (path: string): boolean => {
+    console.log("directoryExists:", path);
+    return ts.sys.directoryExists(path);
+  };
+  sys.fileExists = (path: string): boolean => {
+    console.log("fileExists:", path);
+    return ts.sys.fileExists(path);
+  };
+  let srcUpdateCb: ts.FileWatcherCallback = null;
+  sys.watchFile = (path, callback) => {
+    console.log("watchFile:", path);
+    if (path === joinPath(currentDir, "mysrc/mysrc.ts")) {
+      srcUpdateCb = callback;
+    }
+    return {
+      close: () => {}
+    };
+  };
+  sys.watchDirectory = (path, callback, recursive) => {
+    console.log("watchDirectory:", path);
+    return ts.sys.watchDirectory(path, callback, recursive);
+  };
+
+  const host = ts.createWatchCompilerHost(
+    tsConfigName,
+    {},
+    sys,
+    null,
+    function(d: ts.Diagnostic) {
+      console.log(d.messageText);
+    },
+    function(d: ts.Diagnostic) {
+      console.log(d.messageText);
+    }
+  );
+  // Define host.afterProgramCreate to customize tasks after the recreation of program.
+  // By default, it emits output files!
+  expect(host.createProgram).toBe(
+    ts.createEmitAndSemanticDiagnosticsBuilderProgram
+  );
+  performance.enable();
+  const builder = ts.createWatchProgram(host);
+
+  reportTimeStatistic();
+
+  performance.enable();
+
+  let writeResolve = null;
+  let writePromise = new Promise<{ path: string; data: string }>(resolve => {
+    writeResolve = resolve;
+  });
+
+  console.log("srcUpdateCb", srcUpdateCb);
   srcUpdateCb(srcname, ts.FileWatcherEventKind.Changed);
   const start = Date.now();
   await writePromise;
