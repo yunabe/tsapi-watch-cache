@@ -57,13 +57,14 @@ it("watch-api", async () => {
   sys.setTimeout = (callback, ms) => {
     ts.sys.setTimeout(callback, 0);
   };
-  sys.readFile = function(path, encoding) {
+  let writeResolve = null;
+  sys.readFile = function (path, encoding) {
     if (path === srcname) {
       return `var x: number = ${Math.random()}`;
     }
     return ts.sys.readFile(path, encoding);
   };
-  sys.writeFile = function(path, data) {
+  sys.writeFile = function (path, data) {
     console.log(`Write File:: path == ${path}
 ${data}
 `);
@@ -78,7 +79,7 @@ ${data}
       srcUpdateCb = callback;
     }
     return {
-      close: () => {}
+      close: () => {},
     };
   };
 
@@ -87,10 +88,10 @@ ${data}
     {},
     sys,
     null,
-    function(d: ts.Diagnostic) {
+    function (d: ts.Diagnostic) {
       console.log(d.messageText);
     },
-    function(d: ts.Diagnostic) {
+    function (d: ts.Diagnostic) {
       console.log(d.messageText);
     }
   );
@@ -106,8 +107,7 @@ ${data}
 
   performance.enable();
 
-  let writeResolve = null;
-  let writePromise = new Promise<{ path: string; data: string }>(resolve => {
+  let writePromise = new Promise<{ path: string; data: string }>((resolve) => {
     writeResolve = resolve;
   });
 
@@ -131,11 +131,11 @@ it("watch-api-with-config", async () => {
   sys.setTimeout = (callback, ms) => {
     ts.sys.setTimeout(callback, 0);
   };
-  sys.readFile = function(path, encoding) {
+  sys.readFile = function (path, encoding) {
     console.log("readFile:", path);
     if (path === tsConfigName) {
       return JSON.stringify({
-        include: ["mysrc/**/*"]
+        include: ["mysrc/**/*"],
       });
     }
     if (path === joinPath(currentDir, "mysrc/mysrc.ts")) {
@@ -145,7 +145,7 @@ it("watch-api-with-config", async () => {
     }
     return ts.sys.readFile(path, encoding);
   };
-  sys.writeFile = function(path, data) {
+  sys.writeFile = function (path, data) {
     console.log(`Write File:: path == ${path}
 ${data}
 `);
@@ -187,7 +187,7 @@ ${data}
       srcUpdateCb = callback;
     }
     return {
-      close: () => {}
+      close: () => {},
     };
   };
   sys.watchDirectory = (path, callback, recursive) => {
@@ -200,10 +200,10 @@ ${data}
     {},
     sys,
     null,
-    function(d: ts.Diagnostic) {
+    function (d: ts.Diagnostic) {
       console.log(d.messageText);
     },
-    function(d: ts.Diagnostic) {
+    function (d: ts.Diagnostic) {
       console.log(d.messageText);
     }
   );
@@ -220,7 +220,7 @@ ${data}
   performance.enable();
 
   let writeResolve = null;
-  let writePromise = new Promise<{ path: string; data: string }>(resolve => {
+  let writePromise = new Promise<{ path: string; data: string }>((resolve) => {
     writeResolve = resolve;
   });
 
@@ -251,7 +251,7 @@ it("service-api", async () => {
   let output = service.getEmitOutput(srcname);
   reportTimeStatistic();
   expect(output.emitSkipped).toBeFalsy();
-  output.outputFiles.forEach(file => {
+  output.outputFiles.forEach((file) => {
     if (file.name === "mysrc.js") {
       expect(file.text).toEqual("var i = 10;\r\n");
     } else if (file.name == "mysrc.d.ts") {
@@ -271,7 +271,7 @@ it("service-api", async () => {
   expect(output.emitSkipped).toBeFalsy();
   // "Check time" is long, it's not cached for some reason.
   expect(end - start).toBeGreaterThan(200);
-  output.outputFiles.forEach(file => {
+  output.outputFiles.forEach((file) => {
     if (file.name === "mysrc.js") {
       expect(file.text).toEqual("var j = 20;\r\n");
     } else if (file.name === "mysrc.d.ts") {
@@ -298,7 +298,7 @@ it("service-api", async () => {
       getDefaultLibFileName,
       fileExists,
       readFile,
-      readDirectory
+      readDirectory,
     };
 
     function getProjectVersion() {
@@ -327,7 +327,7 @@ it("service-api", async () => {
       // We may need to implement resolveTypeReferenceDirectives?
       return {
         target: ts.ScriptTarget.ES2017,
-        declaration: true
+        declaration: true,
       };
     }
     function getDefaultLibFileName(options: ts.CompilerOptions): string {
