@@ -1,6 +1,6 @@
 # The usage of TypeScript compiler API to build files incrementally
 
-[![Build Status](https://travis-ci.org/yunabe/tsapi-watch-cache.svg?branch=master)](https://travis-ci.org/yunabe/tsapi-watch-cache)
+[![Node.js CI](https://github.com/yunabe/tsapi-watch-cache/actions/workflows/run_tests.yml/badge.svg)](https://github.com/yunabe/tsapi-watch-cache/actions/workflows/run_tests.yml)
 
 ## Notes
 
