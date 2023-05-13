@@ -25,3 +25,4 @@ jobs:
       - name: Install dependencies
         run: yarn --frozen-lockfile
       - run: yarn test
+      - run: yarn test -t 'custom-after-program'

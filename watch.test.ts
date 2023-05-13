@@ -25,6 +25,12 @@ function reportTimeStatistic() {
   console.log(lines.join("\n"));
 }
 
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 function getTypeFiles(): string[] {
   function findNodeModules(): string | null {
     let dir = __dirname;
@@ -119,6 +125,93 @@ ${data}
   expect(end - start).toBeLessThan(100);
 
   builder.close(); // Not available in typescript3.5.3.
+});
+
+it("custom-after-program-create", async () => {
+  console.log("==== custom-after-program ====");
+  const srcname = "mysrc.ts";
+
+  const sys = Object.create(ts.sys) as ts.System;
+  sys.setTimeout = (callback, ms) => {
+    ts.sys.setTimeout(callback, 0);
+  };
+  sys.readFile = function (path, encoding) {
+    if (path === srcname) {
+      return `var x: number = ${Math.random()}`;
+    }
+    return ts.sys.readFile(path, encoding);
+  };
+  sys.writeFile = function (path, data) {
+    throw new Error("writeFile should not be called");
+  };
+  let srcUpdateCb: ts.FileWatcherCallback = null;
+  sys.watchFile = (path, callback) => {
+    if (path === srcname) {
+      srcUpdateCb = callback;
+    }
+    return {
+      close: () => {},
+    };
+  };
+
+  const host = ts.createWatchCompilerHost(
+    [srcname],
+    {},
+    sys,
+    null,
+    function (d: ts.Diagnostic) {
+      console.log(d.messageText);
+    },
+    function (d: ts.Diagnostic) {
+      console.log(d.messageText);
+    }
+  );
+  // Define host.afterProgramCreate to customize tasks after the recreation of program.
+  // By default, it emits output files!
+  let builder: ts.BuilderProgram;
+  host.afterProgramCreate = function (b: ts.BuilderProgram) {
+    builder = b;
+  };
+  const watch = ts.createWatchProgram(host);
+
+  performance.enable();
+
+  expect(builder).not.toBeNull();
+  builder.emit(
+    builder.getSourceFile(srcname),
+    (fileName: string, data: string) => {
+      console.log({ fileName, data });
+    }
+  );
+  reportTimeStatistic();
+
+  performance.enable();
+  builder = null;
+  srcUpdateCb(srcname, ts.FileWatcherEventKind.Changed);
+  const start = Date.now();
+  for (let i = 0; i < 1000; ++i) {
+    await sleep(1);
+    if (builder != null) {
+      break;
+    }
+  }
+
+  builder.emit(
+    builder.getSourceFile(srcname),
+    (fileName: string, data: string) => {
+      console.log({ fileName, data });
+    }
+  );
+
+  const end = Date.now();
+  reportTimeStatistic();
+  console.log(`took: ${end - start}ms`);
+  expect(end - start).toBeLessThan(100);
+
+  watch.close(); // Not available in typescript3.5.3.
+
+  // To output all console.* results before Jest test result messages.
+  await sleep(100);
 });
 
 it("watch-api-with-config", async () => {
