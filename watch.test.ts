@@ -91,7 +91,7 @@ ${data}
 
   const host = ts.createWatchCompilerHost(
     [srcname],
-    {},
+    { skipLibCheck: true },
     sys,
     null,
     function (d: ts.Diagnostic) {
@@ -156,7 +156,7 @@ it("custom-after-program-create", async () => {
 
   const host = ts.createWatchCompilerHost(
     [srcname],
-    {},
+    { skipLibCheck: true },
     sys,
     null,
     function (d: ts.Diagnostic) {
@@ -195,12 +195,16 @@ it("custom-after-program-create", async () => {
       break;
     }
   }
+  const middle = Date.now();
+  console.log("middle - start:", middle - start);
 
   builder.emit(
     builder.getSourceFile(srcname),
     (fileName: string, data: string) => {
       console.log({ fileName, data });
-    }
+    },
+    undefined,
+    undefined
   );
 
   const end = Date.now();
@@ -290,7 +294,7 @@ ${data}
 
   const host = ts.createWatchCompilerHost(
     tsConfigName,
-    {},
+    { skipLibCheck: true },
     sys,
     null,
     function (d: ts.Diagnostic) {
