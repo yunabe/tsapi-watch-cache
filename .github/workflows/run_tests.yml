@@ -25,4 +25,4 @@ jobs:
       - name: Install dependencies
         run: npm ci
       # - run: yarn test
-      - run: npm test -t 'custom-after-program'
+      - run: npm test -- -t 'custom-after-program'
